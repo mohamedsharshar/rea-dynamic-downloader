@@ -1,5 +1,6 @@
 # ⚡ REA Dynamic Multi-Part Downloader & Scheduler
 
+[![CI](https://github.com/mohamedsharshar/rea-dynamic-downloader/actions/workflows/ci.yml/badge.svg)](https://github.com/mohamedsharshar/rea-dynamic-downloader/actions/workflows/ci.yml)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078D6.svg)](https://microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -78,6 +79,14 @@ python -m PyInstaller --clean --onefile --noconsole --name "REA_Dynamic_Download
 ```
 
 The resulting executable will be in the `dist/` directory.
+
+### 3. Run Automated Tests
+
+To run the built-in test suite (verifies sanitization, RFC 5987, Magic Bytes sniffing, dynamic chunk math, and lossless SHA-256 assembly):
+
+```bash
+python -m unittest discover tests
+```
 
 ---
 

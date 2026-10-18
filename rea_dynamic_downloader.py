@@ -20,6 +20,7 @@ import urllib.parse
 import re
 import mimetypes
 import ctypes
+import ssl
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 from typing import List, Optional
@@ -40,6 +41,20 @@ def acquire_single_instance_lock():
             user32.SetForegroundWindow(hwnd)
         return None
     return mutex
+
+
+def safe_urlopen(req: urllib.request.Request, timeout: int = 20):
+    """فتح الاتصال بمرونة عالية مع دعم تجاوز أخطاء شهادات SSL في البيئات المقيدة."""
+    try:
+        ctx = ssl.create_default_context()
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except urllib.error.URLError as err:
+        err_str = str(err).lower()
+        if "certificate" in err_str or "ssl" in err_str or "handshake" in err_str:
+            ctx_unverified = ssl._create_unverified_context()
+            return urllib.request.urlopen(req, timeout=timeout, context=ctx_unverified)
+        raise
+
 
 # تهيئة قاعدة بيانات أنواع الوسائط
 mimetypes.init()
@@ -475,7 +490,7 @@ class DynamicDownloadEngine:
                     method="HEAD",
                 )
                 try:
-                    with urllib.request.urlopen(req, timeout=12) as response:
+                    with safe_urlopen(req, timeout=12) as response:
                         length_header = response.headers.get("Content-Length")
                         accept_ranges = response.headers.get(
                             "Accept-Ranges", ""
@@ -673,7 +688,7 @@ class DynamicDownloadEngine:
             headers["Range"] = f"bytes={req_start}-{req_end}"
 
         req = urllib.request.Request(task.source, headers=headers)
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with safe_urlopen(req, timeout=20) as resp:
             # فحص الترويسات للقطعة الأولى لاستخراج الاسم والامتداد
             if chunk.chunk_id == 0:
                 cd = resp.headers.get("Content-Disposition", "")
@@ -746,8 +761,10 @@ class DynamicDownloadEngine:
 
                     out.write(buf)
                     buf_len = len(buf)
-                    chunk.current += buf_len
-                    task.downloaded_bytes += buf_len
+                    with chunk.lock:
+                        chunk.current += buf_len
+                    with task.lock:
+                        task.downloaded_bytes += buf_len
 
                     # محدد السرعة اليدوي لكل ملف (Manual Throttle)
                     limit = task.speed_limit_kbps.get()
@@ -778,8 +795,10 @@ class DynamicDownloadEngine:
 
                     out.write(buf)
                     buf_len = len(buf)
-                    chunk.current += buf_len
-                    task.downloaded_bytes += buf_len
+                    with chunk.lock:
+                        chunk.current += buf_len
+                    with task.lock:
+                        task.downloaded_bytes += buf_len
 
                     # محدد السرعة اليدوي
                     limit = task.speed_limit_kbps.get()
@@ -861,6 +880,10 @@ class DynamicDownloadEngine:
 
         task.is_verified = True
         task.status = "مكتمل ومتحقق بنسبة 100%"
+        if task.total_bytes == 0:
+            task.total_bytes = total_stitched
+            task.downloaded_bytes = total_stitched
+            task.progress_percent = 100.0
         try:
             on_log(
                 f"[نجاح] تم دمج {task.file_name} بنجاح! البصمة: {task.final_hash[:16]}...",
@@ -1103,7 +1126,7 @@ class ModernDownloaderWindow:
             "إضافة رابط", "أدخل رابط الملف المباشر (HTTP/HTTPS):", parent=self.root
         )
         if url and url.strip():
-            clean_url = url.strip()
+            clean_url = url.strip().strip('"').strip("'")
             if "youtube.com" in clean_url.lower() or "youtu.be" in clean_url.lower():
                 res = messagebox.askyesno(
                     "تنبيه حول روابط يوتيوب",
