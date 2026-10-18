@@ -1,0 +1,5 @@
+# REA Dynamic Multi-Part Downloader & Scheduler
+# Core runtime relies exclusively on Python standard libraries (tkinter, urllib, threading, hashlib, ctypes).
+
+# Optional: To build the standalone Windows executable (.exe)
+pyinstaller>=6.0.0
